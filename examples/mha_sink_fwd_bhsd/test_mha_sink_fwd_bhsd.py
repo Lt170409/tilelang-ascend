@@ -12,7 +12,7 @@ def _check_precision(actual, golden):
     atol, rtol, cap = {torch.float16:(2**-14,2**-9,1e-1), torch.bfloat16:(2**-10,2**-6,1.0), torch.float32:(2**-16,2**-10,1e-2)}.get(actual.dtype,(2**-14,2**-9,1e-1))
     sa=torch.isnan(actual); sg=torch.isnan(golden)
     if not (torch.equal(sa,sg) and torch.equal(torch.isposinf(actual),torch.isposinf(golden)) and torch.equal(torch.isneginf(actual),torch.isneginf(golden))): raise AssertionError("NaN/Inf mismatch")
-    valid=~sg
+    valid=torch.isfinite(golden)
     if valid.any():
         d=torch.where(torch.isfinite(actual[valid]),(actual[valid]-golden[valid]).abs(),torch.full_like(golden[valid],float("inf"))); p=d<=atol+rtol*golden[valid].abs()
         if p.float().mean().item()<.99 or d.max().item()>cap: raise AssertionError("precision mismatch")

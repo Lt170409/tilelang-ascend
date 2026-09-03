@@ -12,7 +12,7 @@ def _check_precision(actual, golden):
     atol, rtol, max_abs = {torch.float16: (2**-14, 2**-9, 1e-1), torch.bfloat16: (2**-10, 2**-6, 1e0), torch.float32: (2**-16, 2**-10, 1e-2)}.get(actual.dtype, (2**-16, 2**-10, 1e-2))
     a, g = actual.float(), golden.float()
     assert torch.equal(torch.isnan(a), torch.isnan(g)) and torch.equal(torch.isposinf(a), torch.isposinf(g)) and torch.equal(torch.isneginf(a), torch.isneginf(g)), "NaN/Inf structure mismatch"
-    valid = ~sg
+    valid = torch.isfinite(g)
     if valid.any():
         diff = torch.where(torch.isfinite(a[valid]), (a[valid] - g[valid]).abs(), torch.full_like(g[valid], float("inf")))
         assert (diff <= atol + rtol * g[valid].abs()).float().mean().item() >= 0.99, "precision ratio below 0.99"

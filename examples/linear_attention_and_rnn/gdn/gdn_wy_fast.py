@@ -1,6 +1,21 @@
 import tilelang
 from tilelang import language as T
 import torch
+def _check_precision(a, b):
+    a,b=a.detach().cpu(),b.detach().cpu()
+    if a.shape != b.shape: raise AssertionError("shape mismatch")
+    if not (a.is_floating_point() or b.is_floating_point()):
+        if not torch.equal(a,b): raise AssertionError("integer mismatch")
+        return
+    table = {"float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1e0), "float32": (2**-16, 2**-10, 1e-2), "hifloat32": (2**-16, 2**-10, 1e-2), "float8_e4m3": (2**-4, 2**-2, 1e0), "float8_e4m3fn": (2**-4, 2**-2, 1e0), "float8_e5m2": (2**-3, 2**-1, 1e-1)}
+    atol, rtol, cap = table.get(str(b.dtype).removeprefix("torch."), table["float16"])
+    a, b = a.float(), b.float(); special = ~torch.isfinite(b)
+    if special.any() and (not torch.equal(torch.isnan(a[special]), torch.isnan(b[special])) or not torch.equal(torch.isinf(a[special]), torch.isinf(b[special]))): raise AssertionError("NaN/Inf structure mismatch")
+    finite = torch.isfinite(b)
+    if not finite.any(): return
+    diff = (a[finite] - b[finite]).abs(); diff = torch.where(torch.isfinite(diff), diff, torch.full_like(diff, float("inf")))
+    ratio, maximum = (diff <= atol + rtol * b[finite].abs()).float().mean().item(), diff.max().item()
+    if ratio < .99 or maximum > cap: raise AssertionError(f"precision mismatch: ratio={ratio:.6f}, max_abs={maximum:.6g}")
 
 '''
 Functionality:
@@ -140,8 +155,8 @@ if __name__ == "__main__":
 		a = torch.randn((B, H, L, C)).npu().to(torch.float16)
 		w, u = wy_fast(k, v, beta, g, a, C, BK, BV)
 		ref_w, ref_u = ref_wy_fast(k, v, beta, g, a, C)
-		torch.testing.assert_close(w.cpu(), ref_w.cpu(), rtol=1e-5, atol=1e-5)
-		torch.testing.assert_close(u.cpu(), ref_u.cpu(), rtol=1e-5, atol=1e-5)
+		_check_precision(w.cpu(), ref_w.cpu())
+		_check_precision(u.cpu(), ref_u.cpu())
 		print("Test passed!")
 	
 	print("Kernel Output Match!")

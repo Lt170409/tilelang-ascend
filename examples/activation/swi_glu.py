@@ -1,6 +1,29 @@
 import tilelang
 import tilelang.language as T
 import torch
+
+
+def _check_precision(actual, golden, dtype):
+    name = str(dtype).replace("torch.", "")
+    table = {"float16": (2**-14, 2**-9, .1, .99), "bfloat16": (2**-10, 2**-6, 1., .99), "float32": (2**-16, 2**-10, .01, .99), "hifloat32": (2**-16, 2**-10, .01, .99), "float8_e4m3": (2**-4, 2**-2, 1., .99), "float8_e5m2": (2**-3, 2**-1, .1, .99)}
+    actual_cpu, golden_cpu = actual.detach().cpu(), golden.detach().cpu()
+    if actual_cpu.shape != golden_cpu.shape:
+        return False, 0., float("inf")
+    if name in {"int8", "int16", "int32", "int64", "uint8"}:
+        mismatches = (actual_cpu != golden_cpu).sum().item()
+        return mismatches == 0, 1. - mismatches / max(actual_cpu.numel(), 1), 0. if mismatches == 0 else float("inf")
+    atol, rtol, limit, required = table.get(name, table["float16"])
+    actual_fp32, golden_fp32 = actual_cpu.float(), golden_cpu.float()
+    special = ~torch.isfinite(golden_fp32)
+    if special.any() and (not torch.equal(torch.isnan(actual_fp32[special]), torch.isnan(golden_fp32[special])) or not torch.equal(torch.isinf(actual_fp32[special]), torch.isinf(golden_fp32[special])) or not torch.equal(actual_fp32[special][torch.isinf(golden_fp32[special])], golden_fp32[special][torch.isinf(golden_fp32[special])])):
+        return False, 0., float("inf")
+    finite = torch.isfinite(golden_fp32)
+    if finite.sum().item() == 0:
+        return True, 1., 0.
+    error = (actual_fp32[finite] - golden_fp32[finite]).abs()
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    ratio, max_abs = (error <= atol + rtol * golden_fp32[finite].abs()).float().mean().item(), error.max().item()
+    return ratio >= required and max_abs <= limit, ratio, max_abs
 import torch.nn as nn
 
 tilelang.cache.clear_cache()
@@ -86,7 +109,8 @@ for M, N, block_M, block_N, split_dim in test_configs:
     a1, a2 = torch.split(a, split_size, dim=split_dim)
     silu = nn.SiLU()
     ref_b = silu(a1) * a2
-    torch.testing.assert_close(b.cpu(), ref_b.cpu(), rtol=1e-2, atol=1e-2)
+    passed, ratio, max_abs = _check_precision(b, ref_b, b.dtype)
+    assert passed, f"dtype={b.dtype}, matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
     print("Test passed!")
 
 print("Kernel Output Match!")

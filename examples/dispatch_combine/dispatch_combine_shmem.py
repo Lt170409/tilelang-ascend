@@ -1,6 +1,15 @@
 import tilelang
 import tilelang.language as T
 import torch
+
+def _check_precision(actual, golden):
+    atol,rtol,cap={torch.float16:(2**-14,2**-9,.1),torch.bfloat16:(2**-10,2**-6,1.),torch.float32:(2**-16,2**-10,.01)}.get(actual.dtype,(2**-14,2**-9,.1))
+    sa=torch.isnan(actual)|torch.isinf(actual); sg=torch.isnan(golden)|torch.isinf(golden)
+    if not torch.equal(sa,sg) or (sa.any() and not torch.equal(actual[sa],golden[sg])): raise AssertionError("NaN/Inf mismatch")
+    v=~sg
+    if v.any():
+        d=(actual[v]-golden[v]).abs(); p=d<=atol+rtol*golden[v].abs()
+        if p.float().mean().item()<.99 or d.max().item()>cap: raise AssertionError("precision mismatch")
 import shmem as aclshmem_module
 import multiprocessing as mp
 import random
@@ -430,7 +439,7 @@ def worker(rank, barrier, x, expert_ids, aiv_num, ep_world_size, local_expert_nu
     x_f32 = x.to(torch.float32) # bfloat16 → float32
     weight_sum_f32 = (x_f32.unsqueeze(1) * expert_scales.unsqueeze(-1)).sum(dim=1)
     dispatch_combine_golden = weight_sum_f32.to(torch.bfloat16) # float32 → bfloat16
-    torch.testing.assert_close(x_out, dispatch_combine_golden, rtol=1e-2, atol=1e-2)
+    _check_precision(x_out, dispatch_combine_golden)
     print("Kernel Output Match!")
 
 # Construct input

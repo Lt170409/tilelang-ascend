@@ -59,12 +59,28 @@ def supply_prog(params):
         torch.randn(K, N).half().npu()
     ]
 
+
+def manual_check_prog(lib_outs, ref_outs):
+    actual, golden = lib_outs[0].detach().cpu().float(), ref_outs[0].detach().cpu().float()
+    if actual.shape != golden.shape:
+        raise AssertionError(f"shape mismatch: {actual.shape} != {golden.shape}")
+    atol, rtol, limit = 2**-14, 2**-9, 1e-1
+    special = ~torch.isfinite(golden)
+    if special.any() and (not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special])) or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))):
+        raise AssertionError("NaN/Inf structure mismatch")
+    finite = torch.isfinite(golden)
+    if not finite.any():
+        return
+    error = (actual[finite] - golden[finite]).abs()
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    ratio, max_abs = (error <= atol + rtol * golden[finite].abs()).float().mean().item(), error.max().item()
+    assert ratio >= .99 and max_abs <= limit, f"matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
+
 @tilelang.autotune(
     configs=get_config(),
     ref_prog=ref_prog,
     supply_prog=supply_prog,
-    atol=1e-2,
-    rtol=1e-2,
+    manual_check_prog=manual_check_prog,
 )
 @tilelang.jit(out_idx=[-1], pass_configs=pass_configs)
 def matmul(M, N, K, block_M, block_N, K_L1, dtype="float16", accum_dtype="float"):

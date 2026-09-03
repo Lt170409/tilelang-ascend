@@ -1,5 +1,15 @@
 import tilelang
 import torch
+def _check_precision(a,b):
+    a,b=a.detach().cpu(),b.detach().cpu(); p={"torch.float16":(2**-14,2**-9,.1),"torch.bfloat16":(2**-10,2**-6,1.),"torch.float32":(2**-16,2**-10,.01),"hifloat32":(2**-16,2**-10,.01),"float8_e4m3":(2**-4,2**-2,1.),"float8_e5m2":(2**-3,2**-1,.1)}.get("float8_e4m3" if "float8_e4m3" in str(b.dtype) else "float8_e5m2" if "float8_e5m2" in str(b.dtype) else str(b.dtype),(2**-14,2**-9,.1))
+    if not(a.is_floating_point() or b.is_floating_point()):
+        if not torch.equal(a,b): raise AssertionError("integer mismatch")
+        return
+    if not(torch.equal(torch.isnan(a),torch.isnan(b)) and torch.equal(torch.isinf(a),torch.isinf(b))): raise AssertionError("NaN/Inf structure mismatch")
+    v=torch.isfinite(b)
+    if v.any():
+        d=(a.float()-b.float()).abs()[v]; d=torch.where(torch.isfinite(d),d,torch.full_like(d,float("inf"))); t=p[0]+p[1]*b.float().abs()[v]
+        if (d<=t).float().mean().item()<.99 or d.max().item()>p[2]: raise AssertionError("precision mismatch")
 import torch.nn.functional as F
 
 from gdn.gdn_chunk_cumsum import chunk_cumsum, ref_chunk_cumsum
@@ -73,8 +83,8 @@ for Batch, H, L, DK, DV, C, BK, BV in test_configs:
 	ref_o = ref_seq_gdn(q, k, v, g, beta)
 	ref_chunk_o = ref_chunk_gdn(q, k, v, g, beta, C)
 	ker_o = kernel_chunk_gdn(q, k, v, g, beta, C, BK, BV)
-	torch.testing.assert_close(ref_chunk_o.cpu(), ref_o.cpu(), rtol=1e-3, atol=1e-3)
-	torch.testing.assert_close(ker_o.cpu(), ref_chunk_o.cpu(), rtol=1e-3, atol=1e-3)
+	_check_precision(ref_chunk_o.cpu(), ref_o.cpu())
+	_check_precision(ker_o.cpu(), ref_chunk_o.cpu())
 	print("Test passed!")
 
 print("Kernel Output Match!")

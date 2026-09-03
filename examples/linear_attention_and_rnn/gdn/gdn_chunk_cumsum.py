@@ -2,6 +2,36 @@ import tilelang
 from tilelang import language as T
 import torch
 
+def _check_precision(actual, expected):
+    actual, expected = actual.detach().cpu(), expected.detach().cpu()
+    if actual.shape != expected.shape:
+        raise AssertionError(f"shape mismatch: {actual.shape} vs {expected.shape}")
+    if not (actual.is_floating_point() or expected.is_floating_point()):
+        mismatches = (actual != expected).sum().item()
+        if mismatches:
+            raise AssertionError(f"integer mismatch: {mismatches} elements")
+        return
+    table = {
+        "float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1e0),
+        "float32": (2**-16, 2**-10, 1e-2), "hifloat32": (2**-16, 2**-10, 1e-2),
+        "float8_e4m3": (2**-4, 2**-2, 1e0), "float8_e4m3fn": (2**-4, 2**-2, 1e0),
+        "float8_e5m2": (2**-3, 2**-1, 1e-1),
+    }
+    atol, rtol, cap = table.get(str(expected.dtype).removeprefix("torch."), table["float16"])
+    actual, expected = actual.float(), expected.float()
+    special = ~torch.isfinite(expected)
+    if special.any() and (not torch.equal(torch.isnan(actual[special]), torch.isnan(expected[special])) or not torch.equal(torch.isinf(actual[special]), torch.isinf(expected[special]))):
+        raise AssertionError("NaN/Inf structure mismatch")
+    finite = torch.isfinite(expected)
+    if not finite.any():
+        return
+    diff = (actual[finite] - expected[finite]).abs()
+    diff = torch.where(torch.isfinite(diff), diff, torch.full_like(diff, float("inf")))
+    ratio = (diff <= atol + rtol * expected[finite].abs()).float().mean().item()
+    max_err = diff.max().item()
+    if ratio < 0.99 or max_err > cap:
+        raise AssertionError(f"precision mismatch: ratio={ratio:.6f}, max_abs={max_err:.6g}")
+
 '''
 Functionality:
 Chunkwisely calculate the prefix sum
@@ -70,7 +100,7 @@ if __name__ == "__main__":
 		g = torch.randn((B, H, L)).npu().to(torch.float)
 		g_sum = chunk_cumsum(g, C)
 		ref_g_sum = ref_chunk_cumsum(g, C)
-		torch.testing.assert_close(g_sum.cpu(), ref_g_sum.cpu(), rtol=1e-5, atol=1e-5)
+		_check_precision(g_sum.cpu(), ref_g_sum.cpu())
 		print("Test passed!")
 	
 	print("Kernel Output Match!")

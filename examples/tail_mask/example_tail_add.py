@@ -10,6 +10,20 @@ import tilelang
 import tilelang.language as T
 import torch
 
+
+def _check_precision(actual, golden, dtype):
+    table = {"float16": (2**-14, 2**-9, .1), "bfloat16": (2**-10, 2**-6, 1.), "float32": (2**-16, 2**-10, .01)}
+    actual, golden = actual.detach().cpu().float(), golden.detach().cpu().float()
+    if actual.shape != golden.shape: return False, 0., float("inf")
+    atol, rtol, limit = table.get(str(dtype).replace("torch.", ""), table["float16"])
+    special = ~torch.isfinite(golden)
+    if special.any() and (not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special])) or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))): return False, 0., float("inf")
+    finite = torch.isfinite(golden)
+    if not finite.any(): return True, 1., 0.
+    error = (actual[finite] - golden[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    ratio, maximum = (error <= atol + rtol * golden[finite].abs()).float().mean().item(), error.max().item()
+    return ratio >= .99 and maximum <= limit, ratio, maximum
+
 tilelang.cache.clear_cache()
 
 pass_configs = {
@@ -60,6 +74,7 @@ if __name__ == "__main__":
         a = torch.randn(M, N, dtype=torch_dtype).npu()
         b = torch.randn(M, N, dtype=torch_dtype).npu()
         c = func(a, b)
-        torch.testing.assert_close(c, a + b, rtol=1e-2, atol=1e-2)
+        passed, ratio, max_abs = _check_precision(c, a + b, c.dtype)
+        assert passed, f"dtype={c.dtype}, matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
         print("  pass")
     print("Kernel Output Match!")

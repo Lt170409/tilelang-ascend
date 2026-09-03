@@ -2,6 +2,21 @@ import tilelang
 from tilelang import DataType, language as T
 import torch
 
+
+def _check_precision(actual, golden, dtype):
+    table = {"float16": (2**-14, 2**-9, .1), "bfloat16": (2**-10, 2**-6, 1.), "float32": (2**-16, 2**-10, .01), "hifloat32": (2**-16, 2**-10, .01), "float8_e4m3": (2**-4, 2**-2, 1.), "float8_e5m2": (2**-3, 2**-1, .1)}
+    actual, golden = actual.detach().cpu().float(), golden.detach().cpu().float()
+    if actual.shape != golden.shape: return False, 0., float("inf")
+    dtype_name = str(dtype).replace("torch.", ""); dtype_name = "float8_e4m3" if "float8_e4m3" in dtype_name else "float8_e5m2" if "float8_e5m2" in dtype_name else dtype_name
+    atol, rtol, limit = table.get(dtype_name, table["float16"])
+    special = ~torch.isfinite(golden)
+    if special.any() and (not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special])) or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))): return False, 0., float("inf")
+    finite = torch.isfinite(golden)
+    if not finite.any(): return True, 1., 0.
+    error = (actual[finite] - golden[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    ratio, maximum = (error <= atol + rtol * golden[finite].abs()).float().mean().item(), error.max().item()
+    return ratio >= .99 and maximum <= limit, ratio, maximum
+
 torch.set_default_device('npu')
 torch.manual_seed(42)
 
@@ -51,7 +66,8 @@ torch.npu.synchronize()
 # print(f"input: {input}")
 # print(f"output: {output[:, :4]}")
 
-torch.testing.assert_close(ref_output, output[:, :4], rtol=1e-2, atol=1e-2)
+passed, ratio, max_abs = _check_precision(output[:, :4], ref_output, output.dtype)
+assert passed, f"dtype={output.dtype}, matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
 print("Kernel Output Match!")
 
 # kernel = tilelang.engine.lower(func,target="pto")

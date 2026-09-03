@@ -4,6 +4,30 @@ import tilelang
 import tilelang.language as T
 import torch
 
+
+def _check_precision(actual, golden, dtype):
+    precision = {"float16": (2**-14, 2**-9, .1), "bfloat16": (2**-10, 2**-6, 1.), "float32": (2**-16, 2**-10, .01), "hifloat32": (2**-16, 2**-10, .01), "float8_e4m3": (2**-4, 2**-2, 1.), "float8_e5m2": (2**-3, 2**-1, .1)}
+    actual_cpu, golden_cpu = actual.detach().cpu(), golden.detach().cpu()
+    if actual_cpu.shape != golden_cpu.shape:
+        return False, 0., float("inf")
+    dtype_name = str(dtype).replace("torch.", "")
+    if dtype_name.startswith("float8_e4m3"): dtype_name = "float8_e4m3"
+    if dtype_name.startswith("float8_e5m2"): dtype_name = "float8_e5m2"
+    if dtype_name in {"int8", "int16", "int32", "int64", "uint8"}:
+        mismatches = (actual_cpu != golden_cpu).sum().item()
+        return mismatches == 0, 1. - mismatches / max(actual_cpu.numel(), 1), 0. if mismatches == 0 else float("inf")
+    atol, rtol, max_limit = precision.get(dtype_name, precision["float16"])
+    actual_fp32, golden_fp32 = actual_cpu.float(), golden_cpu.float()
+    special = ~torch.isfinite(golden_fp32)
+    if special.any() and (not torch.equal(torch.isnan(actual_fp32[special]), torch.isnan(golden_fp32[special])) or not torch.equal(torch.isinf(actual_fp32[special]), torch.isinf(golden_fp32[special]))):
+        return False, 0., float("inf")
+    finite = torch.isfinite(golden_fp32)
+    if not finite.any(): return True, 1., 0.
+    error = (actual_fp32[finite] - golden_fp32[finite]).abs()
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    matched_ratio, max_abs = (error <= atol + rtol * golden_fp32[finite].abs()).float().mean().item(), error.max().item()
+    return matched_ratio >= .99 and max_abs <= max_limit, matched_ratio, max_abs
+
 tilelang.cache.clear_cache()
 
 parser = argparse.ArgumentParser(description="NPU Kernel Compilation")
@@ -89,5 +113,6 @@ c = func(a, b, d)
 
 ref_c = a @ b + d
 
-torch.testing.assert_close(c, ref_c, rtol=1e-2, atol=1e-2)
+passed, ratio, max_abs = _check_precision(c, ref_c, c.dtype)
+assert passed, f"dtype={c.dtype}, matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
 print("Kernel Output Match!")

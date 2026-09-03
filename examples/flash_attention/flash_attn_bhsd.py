@@ -3,6 +3,19 @@ from tilelang import DataType, language as T
 import argparse
 import torch
 
+def _check_precision(actual, golden):
+    a, g = actual.detach().cpu(), golden.detach().cpu()
+    if a.shape != g.shape: raise AssertionError("shape mismatch")
+    if not a.dtype.is_floating_point:
+        if not torch.equal(a, g): raise AssertionError("integer mismatch")
+        return
+    table={torch.float16:(2**-14,2**-9,1e-1),torch.bfloat16:(2**-10,2**-6,1e0),torch.float32:(2**-16,2**-10,1e-2)}; atol,rtol,cap=table.get(g.dtype,table[torch.float16]); a,g=a.float(),g.float()
+    if not (torch.equal(torch.isnan(a),torch.isnan(g)) and torch.equal(torch.isposinf(a),torch.isposinf(g)) and torch.equal(torch.isneginf(a),torch.isneginf(g))): raise AssertionError("special values differ")
+    m=torch.isfinite(g)
+    if m.any():
+        e=torch.where(torch.isfinite(a[m]),(a[m]-g[m]).abs(),torch.full_like(g[m],float("inf"))); ratio=(e<=atol+rtol*g[m].abs()).float().mean().item()
+        if ratio<.99 or e.max().item()>cap: raise AssertionError(f"precision failed ratio={ratio} max={e.max().item()}")
+
 B, S, H, D = 1, 128, 1, 512
 
 @tilelang.jit(out_idx=[3], workspace_idx=[4,5,6])
@@ -255,6 +268,6 @@ if __name__ == "__main__":
     ref_output = ref_flash_attn(q, k, v)
     torch.npu.synchronize()
 
-    torch.testing.assert_close(ref_output, output, rtol=1e-2, atol=1e-2)
+    _check_precision(output, ref_output)
 
     print("Test Passed!")

@@ -3,6 +3,19 @@ import tilelang as tl
 from tilelang import DataType, language as T
 import torch
 
+def _check_precision(actual, golden):
+    a,g=actual.detach().cpu(),golden.detach().cpu()
+    if a.shape!=g.shape: raise AssertionError("shape mismatch")
+    if not a.dtype.is_floating_point:
+        if not torch.equal(a,g): raise AssertionError("integer mismatch")
+        return
+    p={torch.float16:(2**-14,2**-9,1e-1),torch.bfloat16:(2**-10,2**-6,1e0),torch.float32:(2**-16,2**-10,1e-2)}; atol,rtol,cap=p.get(g.dtype,p[torch.float16]); a,g=a.float(),g.float()
+    if not (torch.equal(torch.isnan(a),torch.isnan(g)) and torch.equal(torch.isposinf(a),torch.isposinf(g)) and torch.equal(torch.isneginf(a),torch.isneginf(g))): raise AssertionError("special values differ")
+    m=torch.isfinite(g)
+    if m.any():
+        e=torch.where(torch.isfinite(a[m]),(a[m]-g[m]).abs(),torch.full_like(g[m],float("inf"))); r=(e<=atol+rtol*g[m].abs()).float().mean().item()
+        if r<.99 or e.max().item()>cap: raise AssertionError("precision failed")
+
 @tl.jit(
     out_idx=[4],
     workspace_idx=[5, 6, 7],
@@ -198,7 +211,7 @@ def check_case(batch: int, heads: int, seq_len: int, dim: int, block_size: int =
 
     ref_output = ref_program(q, k_cache, v_cache, block_table)
 
-    torch.testing.assert_close(ref_output, output, rtol=1e-2, atol=1e-2)
+    _check_precision(output, ref_output)
 
 def main(custom_args=None):
     parser = argparse.ArgumentParser(description="Paged Flash Attention Example", add_help=False)

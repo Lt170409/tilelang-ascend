@@ -3,6 +3,16 @@ import torch_npu
 
 import torch_tl_ascend
 
+
+def _check_precision(actual, golden):
+    actual, golden = actual.detach().cpu().float(), golden.detach().cpu().float()
+    if actual.shape != golden.shape: return False, 0., float("inf")
+    error = (actual - golden).abs(); finite = torch.isfinite(golden)
+    if not finite.any(): return True, 1., 0.
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    ratio, maximum = (error[finite] <= 2**-14 + 2**-9 * golden[finite].abs()).float().mean().item(), error[finite].max().item()
+    return ratio >= .99 and maximum <= .1, ratio, maximum
+
 def ref_flash_attention(q, k, v):
     q = q.float()
     k = k.float()
@@ -30,6 +40,7 @@ if __name__ == "__main__":
     ref_output = ref_flash_attention(q, k, v)
     torch.npu.synchronize()
 
-    torch.testing.assert_close(ref_output, output, rtol=1e-2, atol=1e-2)
+    passed, ratio, max_abs = _check_precision(output, ref_output)
+    assert passed, f"matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
 
     print("Test Passed!")

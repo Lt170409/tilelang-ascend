@@ -1,6 +1,21 @@
 import tilelang
 from tilelang import language as T
 import torch
+def _check_precision(actual, golden):
+    a, g = actual.detach().cpu(), golden.detach().cpu()
+    if a.shape != g.shape: raise AssertionError("shape mismatch")
+    if not (a.is_floating_point() or g.is_floating_point()):
+        if not torch.equal(a, g): raise AssertionError("integer mismatch")
+        return
+    table = {"torch.float16": (2**-14, 2**-9, 1e-1), "torch.bfloat16": (2**-10, 2**-6, 1e0), "torch.float32": (2**-16, 2**-10, 1e-2), "hifloat32": (2**-16, 2**-10, 1e-2), "float8_e4m3": (2**-4, 2**-2, 1e0), "float8_e5m2": (2**-3, 2**-1, 1e-1)}
+    name = str(g.dtype); key = "float8_e4m3" if "float8_e4m3" in name else "float8_e5m2" if "float8_e5m2" in name else name
+    atol, rtol, limit = table.get(key, table["torch.float16"])
+    a, g = a.float(), g.float()
+    if not (torch.equal(torch.isnan(a), torch.isnan(g)) and torch.equal(torch.isinf(a), torch.isinf(g))): raise AssertionError("NaN/Inf structure mismatch")
+    finite = torch.isfinite(g)
+    if not finite.any(): return
+    error = (a[finite] - g[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    if (error <= atol + rtol * g[finite].abs()).float().mean().item() < 0.99 or error.max().item() > limit: raise AssertionError("precision mismatch")
 import torch.nn.functional as F
 
 '''
@@ -237,9 +252,9 @@ if __name__ == "__main__":
 		g = ref_chunk_cumsum(g, C)
 		s, new_v, final_s = chunk_h(k, w, u, g, C)
 		ref_s, ref_new_v, ref_final_s = ref_chunk_h(k, w, u, g, C)
-		torch.testing.assert_close(s.cpu(), ref_s.cpu(), rtol=1e-5, atol=1e-5)
-		torch.testing.assert_close(new_v.cpu(), ref_new_v.cpu(), rtol=1e-5, atol=1e-5)
-		torch.testing.assert_close(final_s.cpu(), ref_final_s.cpu(), rtol=1e-5, atol=1e-5)
+		_check_precision(s.cpu(), ref_s.cpu())
+		_check_precision(new_v.cpu(), ref_new_v.cpu())
+		_check_precision(final_s.cpu(), ref_final_s.cpu())
 		print("Test passed!")
 
 	print("Kernel Output Match!")

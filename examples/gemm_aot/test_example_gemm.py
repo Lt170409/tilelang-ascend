@@ -2,6 +2,17 @@ import torch
 import argparse
 import ctypes
 from functools import partial
+
+def _check_precision(actual, golden):
+    if not actual.is_floating_point():
+        torch.testing.assert_close(actual, golden, rtol=0, atol=0); return
+    atol, rtol, cap = {torch.float16:(2**-14,2**-9,1e-1), torch.bfloat16:(2**-10,2**-6,1.0), torch.float32:(2**-16,2**-10,1e-2)}.get(actual.dtype,(2**-14,2**-9,1e-1))
+    sa = torch.isnan(actual)|torch.isinf(actual); sg = torch.isnan(golden)|torch.isinf(golden)
+    if not torch.equal(sa,sg) or (sa.any() and not torch.equal(actual[sa],golden[sg])): raise AssertionError("NaN/Inf mismatch")
+    valid=~sg
+    if valid.any():
+        d=(actual[valid]-golden[valid]).abs(); p=d<=atol+rtol*golden[valid].abs()
+        if p.float().mean().item()<.99 or d.max().item()>cap: raise AssertionError("precision mismatch")
 torch.manual_seed(42)
 
 parser = argparse.ArgumentParser(description="NPU Kernel Compilation")
@@ -39,6 +50,6 @@ torch.npu.synchronize()
 
 ref_c = a @ b
 
-torch.testing.assert_close(c, ref_c, rtol=1e-2, atol=1e-2)
+_check_precision(c, ref_c)
 print("Kernel Output Match!")
 

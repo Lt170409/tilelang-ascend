@@ -72,10 +72,8 @@ def main() -> None:
         except (ValueError, SyntaxError):
             continue
         harness = source.with_name(f"harness_precision_{source.stem}.py")
-        harness.write_text(
-            TEMPLATE.format(depth=depth, source=relative.as_posix()),
-            encoding="utf-8",
-        )
+        content = TEMPLATE.replace("[{depth}]", f"[{depth}]").replace("{source!r}", repr(relative.as_posix()))
+        harness.write_text(content, encoding="utf-8")
         print(harness.relative_to(root))
 
 

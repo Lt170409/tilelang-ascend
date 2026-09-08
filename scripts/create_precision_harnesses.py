@@ -1,4 +1,4 @@
-"""Create per-file precision-function harnesses for uncovered example files."""
+"""Create per-file pytest checks for uncovered example precision functions."""
 
 from __future__ import annotations
 
@@ -27,12 +27,12 @@ def load_checker(source):
     return namespace[nodes[0].name]
 
 
-def main():
+def test_precision_checker():
     source_path = pathlib.Path(__file__).resolve().parents[{depth}] / {source!r}
     checker = load_checker(source_path.read_text(encoding="utf-8"))
     if checker is None:
-        print("SKIP: no check_precision function")
-        return 0
+        import pytest
+        pytest.skip("no check_precision function")
     actual = torch.zeros(100, dtype=torch.float16)
     golden = torch.zeros_like(actual)
     try:
@@ -46,11 +46,6 @@ def main():
     if not passed:
         raise AssertionError("zero-error case rejected")
     print("PASS: zero-error precision case")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
 '''
 
 
@@ -71,7 +66,7 @@ def main() -> None:
             ast.parse(text, filename=str(source))
         except (ValueError, SyntaxError):
             continue
-        harness = source.with_name(f"harness_precision_{source.stem}.py")
+        harness = source.with_name(f"test_precision_{source.stem}.py")
         content = TEMPLATE.replace("[{depth}]", f"[{depth}]").replace("{source!r}", repr(relative.as_posix()))
         harness.write_text(content, encoding="utf-8")
         print(harness.relative_to(root))

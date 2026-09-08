@@ -14,7 +14,16 @@ MARKERS = ("matched_ratio", "max_abs", "PRECISION_FAIL", "check_precision", "_ch
 TEMPLATE = '''\
 import ast
 import pathlib
+import warnings
 import torch
+
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"torch\.jit\.script_method is deprecated.*",
+    category=DeprecationWarning,
+    module=r"torch\.jit\._script",
+)
 
 
 def load_checker(source):

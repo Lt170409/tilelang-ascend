@@ -1,6 +1,15 @@
 import ast
 import pathlib
+import warnings
 import torch
+
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"torch\.jit\.script_method is deprecated.*",
+    category=DeprecationWarning,
+    module=r"torch\.jit\._script",
+)
 
 
 def load_checker(source):

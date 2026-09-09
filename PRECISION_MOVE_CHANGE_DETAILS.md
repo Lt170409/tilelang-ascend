@@ -244,3 +244,28 @@ python -m pytest -q $(find examples examples_experiment -type f -name 'test_prec
 
 CANN 9.1 运行结果：`53 passed, 2 skipped, 0 failed`。无效测试源码路径：0。
 
+## 变更口径与审查说明
+
+- “153 个文件”表示本 PR 相对 `origin/ascendc_pto` 中包含精度校验标记的 Python 文件总数，不表示 153 个文件都新增了测试入口。
+- 精度实现函数主要为 `_check_precision`；涉及辅助函数时还包括 `_get_precision`、`check_precision`、`check_result`、`check_lse` 和 `check_case`。
+- 新增测试文件统一包含 `load_checker` 与 `test_precision_checker`，并对零误差基线执行判定。
+- 23 个低性能算子实现的迁移属于文件位置调整；由于其中部分文件同时有精度修改，在组合 PR 的整体 diff 中可能显示为“修改后重命名”，不能据此判断迁移改变了算法。
+- 迁移后仍保留 55 个精度测试，所有测试源码路径均已指向实际文件位置。
+
+## CI 门禁与限制
+
+- 已通过 Python 语法编译检查和本地静态路径检查。
+- CANN 9.1 环境下的精度 checker 测试已通过；该结果不等同于所有算子的完整 NPU 端到端执行结果。
+- 两个自动调优示例没有独立精度 checker，因此按预期跳过，不应视为失败。
+- PR 提交后仍需等待目标仓库 GitHub Actions 完成；当前文档不预先宣称 CI 已通过。
+- 若目标仓库 CI 仅扫描 `examples/`，应确认是否需要将 `examples_experiment/` 纳入扫描范围。
+- 若项目要求在 `ci/operator_test_manifest.yaml` 登记新增测试，应由维护者确认这些轻量 checker 测试是否需要登记，避免与现有 runner 重复执行。
+
+## 推荐审核结论
+
+本 PR 可以作为“精度校验标准修正 + 低性能示例归档迁移”提交审核。审核时应分别检查：
+
+1. 精度函数的阈值、通过率、特殊值和整数分支；
+2. 23 个实现文件是否保持纯迁移语义；
+3. 迁移后的测试路径和 CI 收集范围；
+4. 完整 NPU 算子测试是否需要在后续 PR 中单独补充。

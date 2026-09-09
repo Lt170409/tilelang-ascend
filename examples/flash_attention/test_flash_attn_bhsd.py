@@ -4,20 +4,30 @@ from pathlib import Path
 from types import ModuleType
 import torch
 
+
 def _check_precision(a, b):
     a, b = a.detach().cpu(), b.detach().cpu()
-    if a.shape != b.shape: raise AssertionError("shape mismatch")
+    if a.shape != b.shape:
+        raise AssertionError("shape mismatch")
     if not a.dtype.is_floating_point:
-        if not torch.equal(a, b): raise AssertionError("integer mismatch")
+        if not torch.equal(a, b):
+            raise AssertionError("integer mismatch")
         return
     name = str(a.dtype).replace("torch.", "")
     table = {"float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1e0), "float32": (2**-16, 2**-10, 1e-2)}
-    atol, rtol, limit = table.get(name, table["float16"]); a, b = a.float(), b.float()
-    if not (torch.equal(torch.isnan(a), torch.isnan(b)) and torch.equal(torch.isposinf(a), torch.isposinf(b)) and torch.equal(torch.isneginf(a), torch.isneginf(b))): raise AssertionError("special values differ")
+    atol, rtol, limit = table.get(name, table["float16"])
+    a, b = a.float(), b.float()
+    if not (
+        torch.equal(torch.isnan(a), torch.isnan(b))
+        and torch.equal(torch.isposinf(a), torch.isposinf(b))
+        and torch.equal(torch.isneginf(a), torch.isneginf(b))
+    ):
+        raise AssertionError("special values differ")
     finite = torch.isfinite(b)
     if finite.any():
-        err = torch.where(torch.isfinite(a[finite]), (a[finite]-b[finite]).abs(), torch.full_like(b[finite], float("inf")))
-        if (err <= atol + rtol*b[finite].abs()).float().mean().item() < .99 or err.max().item() > limit: raise AssertionError("precision mismatch")
+        err = torch.where(torch.isfinite(a[finite]), (a[finite] - b[finite]).abs(), torch.full_like(b[finite], float("inf")))
+        if (err <= atol + rtol * b[finite].abs()).float().mean().item() < 0.99 or err.max().item() > limit:
+            raise AssertionError("precision mismatch")
 
 
 def _load_flash_attn_example() -> ModuleType:

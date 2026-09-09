@@ -5,19 +5,27 @@ from tilelang import language as T
 
 tilelang.disable_cache()
 
+
 def _check_precision(actual, golden):
     if not actual.is_floating_point():
         torch.testing.assert_close(actual, golden, rtol=0, atol=0)
         return
-    atol, rtol, cap = {torch.float16:(2**-14,2**-9,1e-1), torch.bfloat16:(2**-10,2**-6,1.0), torch.float32:(2**-16,2**-10,1e-2)}.get(actual.dtype, (2**-14,2**-9,1e-1))
-    sa = torch.isnan(actual) | torch.isinf(actual); sg = torch.isnan(golden) | torch.isinf(golden)
+    atol, rtol, cap = {
+        torch.float16: (2**-14, 2**-9, 1e-1),
+        torch.bfloat16: (2**-10, 2**-6, 1.0),
+        torch.float32: (2**-16, 2**-10, 1e-2),
+    }.get(actual.dtype, (2**-14, 2**-9, 1e-1))
+    sa = torch.isnan(actual) | torch.isinf(actual)
+    sg = torch.isnan(golden) | torch.isinf(golden)
     if not torch.equal(sa, sg) or (sa.any() and not torch.equal(actual[sa], golden[sg])):
         raise AssertionError("NaN/Inf structure mismatch")
     valid = ~sg
     if valid.any():
-        diff = (actual[valid]-golden[valid]).abs(); passed = diff <= atol + rtol * golden[valid].abs()
+        diff = (actual[valid] - golden[valid]).abs()
+        passed = diff <= atol + rtol * golden[valid].abs()
         if passed.float().mean().item() < 0.99 or diff.max().item() > cap:
             raise AssertionError("precision mismatch")
+
 
 # ---------------------------------------------------------------------------
 # Pass configs (from cann_bench/_common.py + gather.py)

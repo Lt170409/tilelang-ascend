@@ -29,9 +29,7 @@ def _check_precision(actual, golden, dtype):
     errors = (actual[finite] - golden[finite]).abs()
     ratio = (errors <= atol + rtol * golden[finite].abs()).float().mean().item()
     max_abs = errors.max().item()
-    assert ratio >= required_ratio and max_abs <= max_abs_limit, (
-        f"matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
-    )
+    assert ratio >= required_ratio and max_abs <= max_abs_limit, f"matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
 
 
 def _load_int8_gemm_example() -> ModuleType:

@@ -1,17 +1,30 @@
 import torch
 
+
 def _check_precision(actual, golden):
-    a,g=actual.detach().cpu(),golden.detach().cpu()
-    if a.shape!=g.shape: raise AssertionError("shape mismatch")
+    a, g = actual.detach().cpu(), golden.detach().cpu()
+    if a.shape != g.shape:
+        raise AssertionError("shape mismatch")
     if not a.dtype.is_floating_point:
-        if not torch.equal(a,g): raise AssertionError("integer mismatch")
+        if not torch.equal(a, g):
+            raise AssertionError("integer mismatch")
         return
-    p={torch.float16:(2**-14,2**-9,1e-1),torch.bfloat16:(2**-10,2**-6,1e0),torch.float32:(2**-16,2**-10,1e-2)}; atol,rtol,cap=p.get(g.dtype,p[torch.float16]); a,g=a.float(),g.float()
-    if not (torch.equal(torch.isnan(a),torch.isnan(g)) and torch.equal(torch.isposinf(a),torch.isposinf(g)) and torch.equal(torch.isneginf(a),torch.isneginf(g))): raise AssertionError("special values differ")
-    valid=torch.isfinite(g)
+    p = {torch.float16: (2**-14, 2**-9, 1e-1), torch.bfloat16: (2**-10, 2**-6, 1e0), torch.float32: (2**-16, 2**-10, 1e-2)}
+    atol, rtol, cap = p.get(g.dtype, p[torch.float16])
+    a, g = a.float(), g.float()
+    if not (
+        torch.equal(torch.isnan(a), torch.isnan(g))
+        and torch.equal(torch.isposinf(a), torch.isposinf(g))
+        and torch.equal(torch.isneginf(a), torch.isneginf(g))
+    ):
+        raise AssertionError("special values differ")
+    valid = torch.isfinite(g)
     if valid.any():
-        d=torch.where(torch.isfinite(a[valid]),(a[valid]-g[valid]).abs(),torch.full_like(g[valid],float("inf"))); q=(d<=atol+rtol*g[valid].abs()).float().mean().item()
-        if q<.99 or d.max().item()>cap: raise AssertionError("precision mismatch")
+        d = torch.where(torch.isfinite(a[valid]), (a[valid] - g[valid]).abs(), torch.full_like(g[valid], float("inf")))
+        q = (d <= atol + rtol * g[valid].abs()).float().mean().item()
+        if q < 0.99 or d.max().item() > cap:
+            raise AssertionError("precision mismatch")
+
 
 import tilelang
 from tilelang import language as T

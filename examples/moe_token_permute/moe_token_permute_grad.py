@@ -4,18 +4,25 @@ import tilelang.language as T
 import torch
 import torch_npu
 
+
 def _check_precision(actual, golden):
-    if actual.dtype != golden.dtype or actual.shape != golden.shape: raise AssertionError("shape/dtype mismatch")
+    if actual.dtype != golden.dtype or actual.shape != golden.shape:
+        raise AssertionError("shape/dtype mismatch")
     if not actual.dtype.is_floating_point:
-        if not torch.equal(actual, golden): raise AssertionError("integer mismatch")
+        if not torch.equal(actual, golden):
+            raise AssertionError("integer mismatch")
         return
-    params={torch.float16:(2**-14,2**-9,1e-1),torch.bfloat16:(2**-10,2**-6,1e0),torch.float32:(2**-16,2**-10,1e-2)}
-    atol,rtol,cap=params.get(actual.dtype,(2**-16,2**-10,1e-2))
-    if not torch.equal(torch.isnan(actual),torch.isnan(golden)) or not torch.equal(torch.isinf(actual),torch.isinf(golden)): raise AssertionError("NaN/Inf structure mismatch")
-    valid=~(torch.isnan(actual)|torch.isnan(golden)|torch.isinf(actual)|torch.isinf(golden))
+    params = {torch.float16: (2**-14, 2**-9, 1e-1), torch.bfloat16: (2**-10, 2**-6, 1e0), torch.float32: (2**-16, 2**-10, 1e-2)}
+    atol, rtol, cap = params.get(actual.dtype, (2**-16, 2**-10, 1e-2))
+    if not torch.equal(torch.isnan(actual), torch.isnan(golden)) or not torch.equal(torch.isinf(actual), torch.isinf(golden)):
+        raise AssertionError("NaN/Inf structure mismatch")
+    valid = ~(torch.isnan(actual) | torch.isnan(golden) | torch.isinf(actual) | torch.isinf(golden))
     if valid.any():
-        diff=(actual[valid]-golden[valid]).abs(); ratio=(diff<=atol+rtol*golden[valid].abs()).float().mean().item()
-        if ratio<0.99 or diff.max().item()>cap: raise AssertionError(f"precision ratio={ratio:.4f}, max_abs={diff.max().item():.4g}")
+        diff = (actual[valid] - golden[valid]).abs()
+        ratio = (diff <= atol + rtol * golden[valid].abs()).float().mean().item()
+        if ratio < 0.99 or diff.max().item() > cap:
+            raise AssertionError(f"precision ratio={ratio:.4f}, max_abs={diff.max().item():.4g}")
+
 
 try:
     from .moe_token_utils import is_fp32_dtype

@@ -1,17 +1,30 @@
 import argparse
 import torch
 
+
 def _check_precision(actual, golden):
-    if actual.shape != golden.shape: raise AssertionError("shape mismatch")
-    if actual.dtype in {torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8}: 
-        if not torch.equal(actual, golden): raise AssertionError("integer mismatch")
+    if actual.shape != golden.shape:
+        raise AssertionError("shape mismatch")
+    if actual.dtype in {torch.int8, torch.int16, torch.int32, torch.int64, torch.uint8}:
+        if not torch.equal(actual, golden):
+            raise AssertionError("integer mismatch")
         return
     actual, golden = actual.float(), golden.float()
-    if not (torch.equal(torch.isnan(actual), torch.isnan(golden)) and torch.equal(torch.isposinf(actual), torch.isposinf(golden)) and torch.equal(torch.isneginf(actual), torch.isneginf(golden))): raise AssertionError("special values differ")
+    if not (
+        torch.equal(torch.isnan(actual), torch.isnan(golden))
+        and torch.equal(torch.isposinf(actual), torch.isposinf(golden))
+        and torch.equal(torch.isneginf(actual), torch.isneginf(golden))
+    ):
+        raise AssertionError("special values differ")
     finite = torch.isfinite(golden)
-    if not finite.any(): return
-    error = (actual[finite]-golden[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
-    if (error <= 2**-14 + 2**-9 * golden[finite].abs()).float().mean().item() < .99 or error.max().item() > 1e-1: raise AssertionError("precision failed")
+    if not finite.any():
+        return
+    error = (actual[finite] - golden[finite]).abs()
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    if (error <= 2**-14 + 2**-9 * golden[finite].abs()).float().mean().item() < 0.99 or error.max().item() > 1e-1:
+        raise AssertionError("precision failed")
+
+
 import torch_npu
 
 torch.set_default_device("npu")

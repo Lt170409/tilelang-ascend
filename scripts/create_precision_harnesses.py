@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import ast
 import pathlib
-import textwrap
 
 
 EXCLUDED = {"__init__.py", "utils.py", "golden.py", "setup.py"}
 MARKERS = ("matched_ratio", "max_abs", "PRECISION_FAIL", "check_precision", "_check_precision")
 
 
-TEMPLATE = '''\
+TEMPLATE = """\
 import ast
 import pathlib
 import warnings
@@ -20,9 +19,9 @@ import torch
 
 warnings.filterwarnings(
     "ignore",
-    message=r"torch\.jit\.script_method is deprecated.*",
+    message=r"torch\\.jit\\.script_method is deprecated.*",
     category=DeprecationWarning,
-    module=r"torch\.jit\._script",
+    module=r"torch\\.jit\\._script",
 )
 
 
@@ -73,33 +72,33 @@ def test_precision_checker():
 
 if __name__ == "__main__":
     test_precision_checker()
-'''
+"""
 
 
 def main() -> None:
     root = pathlib.Path(__file__).resolve().parents[1]
     examples_roots = [root / "examples", root / "examples_experiment"]
     for examples in examples_roots:
-      if not examples.exists():
-        continue
-      for source in examples.rglob("*.py"):
-          if source.name in EXCLUDED:
-              continue
-          text = source.read_text(encoding="utf-8", errors="replace")
-          if not any(marker in text for marker in MARKERS):
-              continue
-          if "__main__" in text or "def test_" in text or "pytest" in text:
-              continue
-          try:
-              relative = source.relative_to(root)
-              depth = len(relative.parts) - 1
-              ast.parse(text, filename=str(source))
-          except (ValueError, SyntaxError):
-              continue
-          harness = source.with_name(f"test_precision_{source.stem}.py")
-          content = TEMPLATE.replace("[{depth}]", f"[{depth}]").replace("{source!r}", repr(relative.as_posix()))
-          harness.write_text(content, encoding="utf-8")
-          print(harness.relative_to(root))
+        if not examples.exists():
+            continue
+        for source in examples.rglob("*.py"):
+            if source.name in EXCLUDED:
+                continue
+            text = source.read_text(encoding="utf-8", errors="replace")
+            if not any(marker in text for marker in MARKERS):
+                continue
+            if "__main__" in text or "def test_" in text or "pytest" in text:
+                continue
+            try:
+                relative = source.relative_to(root)
+                depth = len(relative.parts) - 1
+                ast.parse(text, filename=str(source))
+            except (ValueError, SyntaxError):
+                continue
+            harness = source.with_name(f"test_precision_{source.stem}.py")
+            content = TEMPLATE.replace("[{depth}]", f"[{depth}]").replace("{source!r}", repr(relative.as_posix()))
+            harness.write_text(content, encoding="utf-8")
+            print(harness.relative_to(root))
 
 
 if __name__ == "__main__":

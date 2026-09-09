@@ -23,9 +23,14 @@ INT32 = "int32"
 
 
 def _check_precision(actual, golden, dtype):
-    table = {"float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1.0),
-             "float32": (2**-16, 2**-10, 1e-2), "hifloat32": (2**-16, 2**-10, 1e-2),
-             "float8_e4m3": (2**-4, 2**-2, 1.0), "float8_e5m2": (2**-3, 2**-1, 1e-1)}
+    table = {
+        "float16": (2**-14, 2**-9, 1e-1),
+        "bfloat16": (2**-10, 2**-6, 1.0),
+        "float32": (2**-16, 2**-10, 1e-2),
+        "hifloat32": (2**-16, 2**-10, 1e-2),
+        "float8_e4m3": (2**-4, 2**-2, 1.0),
+        "float8_e5m2": (2**-3, 2**-1, 1e-1),
+    }
     if dtype not in table:
         assert torch.equal(actual.detach().cpu(), golden.detach().cpu()), "integer output mismatch"
         return
@@ -35,7 +40,8 @@ def _check_precision(actual, golden, dtype):
     assert torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special]))
     assert torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))
     finite = torch.isfinite(golden)
-    if not finite.any(): return
+    if not finite.any():
+        return
     error = (actual[finite] - golden[finite]).abs()
     ratio = (error <= atol + rtol * golden[finite].abs()).float().mean().item()
     max_abs = error.max().item()

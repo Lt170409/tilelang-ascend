@@ -39,6 +39,7 @@ def _check_precision(actual, golden, dtype):
         f"matched_ratio={matched_ratio:.4f}, max_abs_error={max_abs_error:.3e}"
     )
 
+
 DEFAULT_HEAD_DIM = 576
 DEFAULT_ROPE_DIM = 64
 DEFAULT_DTYPE = "bf16"

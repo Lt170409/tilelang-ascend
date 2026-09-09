@@ -520,7 +520,9 @@ if __name__ == "__main__":
 
     for name, shape, dtype_str, num_groups, eps in test_cases:
         torch_dtype = getattr(torch, dtype_str)
-        atol, rtol, max_abs_cap = {"float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1.0), "float32": (2**-16, 2**-10, 1e-2)}[dtype_str]
+        atol, rtol, max_abs_cap = {"float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1.0), "float32": (2**-16, 2**-10, 1e-2)}[
+            dtype_str
+        ]
 
         if name == "all_zeros_fp32":
             x = torch.zeros(shape, dtype=torch_dtype, device="npu")
@@ -557,16 +559,21 @@ if __name__ == "__main__":
             continue
         y_g = y_golden.float().cpu()
 
-        k_special = ~torch.isfinite(y_k); g_special = ~torch.isfinite(y_g)
+        k_special = ~torch.isfinite(y_k)
+        g_special = ~torch.isfinite(y_g)
         structure_ok = torch.equal(k_special, g_special)
-        if structure_ok and g_special.any(): structure_ok = torch.equal(y_k[g_special], y_g[g_special])
+        if structure_ok and g_special.any():
+            structure_ok = torch.equal(y_k[g_special], y_g[g_special])
         valid = ~g_special
         if valid.any():
-            abs_diff = (y_k[valid] - y_g[valid]).abs(); passed_mask = abs_diff <= atol + rtol * y_g[valid].abs()
-            ratio = passed_mask.float().mean().item(); max_abs = abs_diff.max().item()
+            abs_diff = (y_k[valid] - y_g[valid]).abs()
+            passed_mask = abs_diff <= atol + rtol * y_g[valid].abs()
+            ratio = passed_mask.float().mean().item()
+            max_abs = abs_diff.max().item()
             passed = structure_ok and ratio >= 0.99 and max_abs <= max_abs_cap
         else:
-            ratio, max_abs = 1.0, 0.0; passed = structure_ok
+            ratio, max_abs = 1.0, 0.0
+            passed = structure_ok
         status = "[PRECISION_PASS]" if passed else "[PRECISION_FAIL]"
         if not passed:
             all_passed = False

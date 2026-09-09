@@ -2,19 +2,39 @@ import torch
 
 
 def _check_precision(actual, golden, dtype):
-    table = {"float16": (2**-14, 2**-9, 1e-1), "bfloat16": (2**-10, 2**-6, 1e0), "float32": (2**-16, 2**-10, 1e-2), "hifloat32": (2**-16, 2**-10, 1e-2), "float8_e4m3": (2**-4, 2**-2, 1e0), "float8_e4m3fn": (2**-4, 2**-2, 1e0), "float8_e5m2": (2**-3, 2**-1, 1e-1)}
+    table = {
+        "float16": (2**-14, 2**-9, 1e-1),
+        "bfloat16": (2**-10, 2**-6, 1e0),
+        "float32": (2**-16, 2**-10, 1e-2),
+        "hifloat32": (2**-16, 2**-10, 1e-2),
+        "float8_e4m3": (2**-4, 2**-2, 1e0),
+        "float8_e4m3fn": (2**-4, 2**-2, 1e0),
+        "float8_e5m2": (2**-3, 2**-1, 1e-1),
+    }
     actual, golden = actual.detach().cpu(), golden.detach().cpu()
-    if actual.shape != golden.shape: return False, 0., float("inf")
+    if actual.shape != golden.shape:
+        return False, 0.0, float("inf")
     if not (actual.is_floating_point() or golden.is_floating_point()):
-        mismatches = (actual != golden).sum().item(); return mismatches == 0, 1.0 - mismatches / max(actual.numel(), 1), 0.0 if mismatches == 0 else float("inf")
-    atol, rtol, limit = table.get(str(dtype).replace("torch.", ""), table["float16"]); special = ~torch.isfinite(golden)
-    actual, golden = actual.float(), golden.float(); special = ~torch.isfinite(golden)
-    if special.any() and (not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special])) or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))): return False, 0., float("inf")
+        mismatches = (actual != golden).sum().item()
+        return mismatches == 0, 1.0 - mismatches / max(actual.numel(), 1), 0.0 if mismatches == 0 else float("inf")
+    atol, rtol, limit = table.get(str(dtype).replace("torch.", ""), table["float16"])
+    special = ~torch.isfinite(golden)
+    actual, golden = actual.float(), golden.float()
+    special = ~torch.isfinite(golden)
+    if special.any() and (
+        not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special]))
+        or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))
+    ):
+        return False, 0.0, float("inf")
     finite = torch.isfinite(golden)
-    if not finite.any(): return True, 1., 0.
-    error = (actual[finite] - golden[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    if not finite.any():
+        return True, 1.0, 0.0
+    error = (actual[finite] - golden[finite]).abs()
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
     ratio, maximum = (error <= atol + rtol * golden[finite].abs()).float().mean().item(), error.max().item()
-    return ratio >= .99 and maximum <= limit, ratio, maximum
+    return ratio >= 0.99 and maximum <= limit, ratio, maximum
+
+
 import tilelang
 import tilelang.language as T
 import argparse
@@ -30,9 +50,7 @@ device = torch.device("npu")
 
 
 @tilelang.jit(pass_configs=pass_configs)
-def rope_kernel_in_place(
-    M, block_M, batch_size, hidden_size, rope_dim, head_num, dtype="float16"
-):
+def rope_kernel_in_place(M, block_M, batch_size, hidden_size, rope_dim, head_num, dtype="float16"):
     VEC_NUM = 2
     m_num = M // block_M
 
@@ -42,7 +60,6 @@ def rope_kernel_in_place(
 
     ACC_DTYPE = "float32"
     MASK_DTYPE = "uint32"
-    TMP_DTYPE = "uint8"
 
     @T.prim_func
     def kernel(
@@ -136,9 +153,7 @@ def tilelang_apply_rope_partial_in_place(x, sin, cos):
     cos = cos.to(device)
     mask = mask.to(device)
 
-    kernel = rope_kernel_in_place(
-        total_rows, block_M, bsz, hidden_size, rope_dim, head_num
-    )
+    kernel = rope_kernel_in_place(total_rows, block_M, bsz, hidden_size, rope_dim, head_num)
     kernel(x, sin, cos, mask, sin_mask)
 
     return x.view(org_shape)
@@ -188,9 +203,7 @@ if __name__ == "__main__":
     device = "npu"
     torch_dtype = torch.float16
 
-    x = torch.randn(
-        (batch_size, head_num, hidden_size), device=device, dtype=torch_dtype
-    )
+    x = torch.randn((batch_size, head_num, hidden_size), device=device, dtype=torch_dtype)
     sin = torch.randn((batch_size, rope_dim), device=device, dtype=torch_dtype)
     cos = torch.randn((batch_size, rope_dim), device=device, dtype=torch_dtype)
 
@@ -198,9 +211,7 @@ if __name__ == "__main__":
     dim_start = hidden_size - rope_dim
     x_ref = x.clone()
     x_part = x_ref[..., dim_start:]
-    x_part_out = torch_rope_ref(
-        x_part.to(torch.float32), sin.to(torch.float32), cos.to(torch.float32)
-    )
+    x_part_out = torch_rope_ref(x_part.to(torch.float32), sin.to(torch.float32), cos.to(torch.float32))
     x_ref[..., dim_start:] = x_part_out
 
     # 2. Run TileLang Kernel

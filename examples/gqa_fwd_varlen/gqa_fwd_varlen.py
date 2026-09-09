@@ -10,15 +10,20 @@ def _check_precision(actual, golden):
     table = {torch.float16: (2**-14, 2**-9, 1e-1), torch.bfloat16: (2**-10, 2**-6, 1e0), torch.float32: (2**-16, 2**-10, 1e-2)}
     atol, rtol, max_abs = table.get(dtype, (2**-16, 2**-10, 1e-2))
     a, g = actual.float(), golden.float()
-    if not (torch.equal(torch.isnan(a),torch.isnan(g)) and torch.equal(torch.isposinf(a),torch.isposinf(g)) and torch.equal(torch.isneginf(a),torch.isneginf(g))):
+    if not (
+        torch.equal(torch.isnan(a), torch.isnan(g))
+        and torch.equal(torch.isposinf(a), torch.isposinf(g))
+        and torch.equal(torch.isneginf(a), torch.isneginf(g))
+    ):
         raise AssertionError("NaN/Inf structure mismatch")
-    valid = ~special_g
+    valid = torch.isfinite(g)
     if valid.any():
         diff = torch.where(torch.isfinite(a[valid]), (a[valid] - g[valid]).abs(), torch.full_like(g[valid], float("inf")))
         if (diff > (atol + rtol * g[valid].abs())).float().mean().item() > 0.01:
             raise AssertionError("precision ratio below 0.99")
         if diff.max().item() > max_abs:
             raise AssertionError("maximum absolute error exceeded")
+
 
 import tilelang
 from tilelang import language as T

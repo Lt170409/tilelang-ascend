@@ -3,14 +3,24 @@ import tilelang
 from tilelang import language as T
 import torch
 
-def _check_precision(a,b):
-    atol,rtol,cap=(2**-14,2**-9,.1) if a.dtype==torch.float16 else ((2**-10,2**-6,1.) if a.dtype==torch.bfloat16 else (2**-16,2**-10,.01))
-    sa=torch.isnan(a)|torch.isinf(a); sb=torch.isnan(b)|torch.isinf(b)
-    if not torch.equal(sa,sb) or (sa.any() and not torch.equal(a[sa],b[sb])): raise AssertionError('special mismatch')
-    v=~sb
+
+def _check_precision(a, b):
+    atol, rtol, cap = (
+        (2**-14, 2**-9, 0.1)
+        if a.dtype == torch.float16
+        else ((2**-10, 2**-6, 1.0) if a.dtype == torch.bfloat16 else (2**-16, 2**-10, 0.01))
+    )
+    sa = torch.isnan(a) | torch.isinf(a)
+    sb = torch.isnan(b) | torch.isinf(b)
+    if not torch.equal(sa, sb) or (sa.any() and not torch.equal(a[sa], b[sb])):
+        raise AssertionError("special mismatch")
+    v = ~sb
     if v.any():
-        d=(a[v]-b[v]).abs(); p=d<=atol+rtol*b[v].abs()
-        if p.float().mean().item()<.99 or d.max().item()>cap: raise AssertionError('precision mismatch')
+        d = (a[v] - b[v]).abs()
+        p = d <= atol + rtol * b[v].abs()
+        if p.float().mean().item() < 0.99 or d.max().item() > cap:
+            raise AssertionError("precision mismatch")
+
 
 tilelang.cache.clear_cache()
 SOFTPLUS_THRESHOLD = 20.0

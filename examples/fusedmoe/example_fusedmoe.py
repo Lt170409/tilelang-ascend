@@ -20,6 +20,7 @@ import torch.nn.functional as F
 import tilelang
 import tilelang.language as T
 
+
 def _check_precision(actual, golden):
     if not actual.is_floating_point():
         torch.testing.assert_close(actual, golden, rtol=0, atol=0)
@@ -41,6 +42,7 @@ def _check_precision(actual, golden):
     max_abs = diff.max().item()
     if ratio < 0.99 or max_abs > cap:
         raise AssertionError(f"precision mismatch: ratio={ratio:.6f}, max_abs={max_abs:.6g}")
+
 
 # Block sizes (all at hardware limits)
 BLOCK_M = 64

@@ -112,6 +112,7 @@ def ref_bwd(Q, K, V, Sinks, dO, window_size=None, groups=1):
 # Precision checks (precision-standard.md)
 # ============================================================================
 
+
 def get_precision(dtype_str):
     fp_table = {
         "float16": (2**-14, 2**-9, 1e-1, 0.99),

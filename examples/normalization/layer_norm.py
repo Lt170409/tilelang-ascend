@@ -4,23 +4,42 @@ import torch
 
 
 def _check_precision(actual, golden, dtype):
-    table = {"float16": (2**-14, 2**-9, .1), "bfloat16": (2**-10, 2**-6, 1.), "float32": (2**-16, 2**-10, .01), "hifloat32": (2**-16, 2**-10, .01), "float8_e4m3": (2**-4, 2**-2, 1.), "float8_e5m2": (2**-3, 2**-1, .1)}
+    table = {
+        "float16": (2**-14, 2**-9, 0.1),
+        "bfloat16": (2**-10, 2**-6, 1.0),
+        "float32": (2**-16, 2**-10, 0.01),
+        "hifloat32": (2**-16, 2**-10, 0.01),
+        "float8_e4m3": (2**-4, 2**-2, 1.0),
+        "float8_e5m2": (2**-3, 2**-1, 0.1),
+    }
     actual_cpu, golden_cpu = actual.detach().cpu(), golden.detach().cpu()
-    if actual_cpu.shape != golden_cpu.shape: return False, 0., float("inf")
+    if actual_cpu.shape != golden_cpu.shape:
+        return False, 0.0, float("inf")
     name = str(dtype).replace("torch.", "")
-    if name.startswith("float8_e4m3"): name = "float8_e4m3"
-    if name.startswith("float8_e5m2"): name = "float8_e5m2"
+    if name.startswith("float8_e4m3"):
+        name = "float8_e4m3"
+    if name.startswith("float8_e5m2"):
+        name = "float8_e5m2"
     if name in {"int8", "int16", "int32", "int64", "uint8"}:
         mismatch = (actual_cpu != golden_cpu).sum().item()
-        return mismatch == 0, 1. - mismatch / max(actual_cpu.numel(), 1), 0. if mismatch == 0 else float("inf")
-    atol, rtol, limit = table.get(name, table["float16"]); actual_cpu, golden_cpu = actual_cpu.float(), golden_cpu.float()
+        return mismatch == 0, 1.0 - mismatch / max(actual_cpu.numel(), 1), 0.0 if mismatch == 0 else float("inf")
+    atol, rtol, limit = table.get(name, table["float16"])
+    actual_cpu, golden_cpu = actual_cpu.float(), golden_cpu.float()
     special = ~torch.isfinite(golden_cpu)
-    if special.any() and (not torch.equal(torch.isnan(actual_cpu[special]), torch.isnan(golden_cpu[special])) or not torch.equal(torch.isinf(actual_cpu[special]), torch.isinf(golden_cpu[special])) or not torch.equal(actual_cpu[special][torch.isinf(golden_cpu[special])], golden_cpu[special][torch.isinf(golden_cpu[special])])): return False, 0., float("inf")
+    if special.any() and (
+        not torch.equal(torch.isnan(actual_cpu[special]), torch.isnan(golden_cpu[special]))
+        or not torch.equal(torch.isinf(actual_cpu[special]), torch.isinf(golden_cpu[special]))
+        or not torch.equal(actual_cpu[special][torch.isinf(golden_cpu[special])], golden_cpu[special][torch.isinf(golden_cpu[special])])
+    ):
+        return False, 0.0, float("inf")
     finite = torch.isfinite(golden_cpu)
-    if not finite.any(): return True, 1., 0.
-    error = (actual_cpu[finite] - golden_cpu[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+    if not finite.any():
+        return True, 1.0, 0.0
+    error = (actual_cpu[finite] - golden_cpu[finite]).abs()
+    error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
     ratio, max_abs = (error <= atol + rtol * golden_cpu[finite].abs()).float().mean().item(), error.max().item()
-    return ratio >= .99 and max_abs <= limit, ratio, max_abs
+    return ratio >= 0.99 and max_abs <= limit, ratio, max_abs
+
 
 tilelang.cache.clear_cache()
 

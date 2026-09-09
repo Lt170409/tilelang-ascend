@@ -1415,9 +1415,7 @@ if __name__ == "__main__":
         errors = (actual[finite] - golden[finite]).abs()
         ratio = (errors <= atol + rtol * golden[finite].abs()).float().mean().item()
         max_abs = errors.max().item()
-        assert ratio >= required_ratio and max_abs <= max_abs_limit, (
-            f"matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
-        )
+        assert ratio >= required_ratio and max_abs <= max_abs_limit, f"matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
 
     def _check_result(g_idx, g_score_matrix, g_val, tl_idx, tl_val, asq, layout_query, is_pa):
         """AscendC-style 3-step verification (strict per-row).

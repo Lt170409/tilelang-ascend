@@ -9,14 +9,23 @@ def _check_precision(actual, golden):
     if not actual.dtype.is_floating_point:
         assert torch.equal(actual, golden), "integer outputs differ"
         return
-    atol, rtol, max_abs = {torch.float16: (2**-14, 2**-9, 1e-1), torch.bfloat16: (2**-10, 2**-6, 1e0), torch.float32: (2**-16, 2**-10, 1e-2)}.get(actual.dtype, (2**-16, 2**-10, 1e-2))
+    atol, rtol, max_abs = {
+        torch.float16: (2**-14, 2**-9, 1e-1),
+        torch.bfloat16: (2**-10, 2**-6, 1e0),
+        torch.float32: (2**-16, 2**-10, 1e-2),
+    }.get(actual.dtype, (2**-16, 2**-10, 1e-2))
     a, g = actual.float(), golden.float()
-    assert torch.equal(torch.isnan(a), torch.isnan(g)) and torch.equal(torch.isposinf(a), torch.isposinf(g)) and torch.equal(torch.isneginf(a), torch.isneginf(g)), "NaN/Inf structure mismatch"
+    assert (
+        torch.equal(torch.isnan(a), torch.isnan(g))
+        and torch.equal(torch.isposinf(a), torch.isposinf(g))
+        and torch.equal(torch.isneginf(a), torch.isneginf(g))
+    ), "NaN/Inf structure mismatch"
     valid = torch.isfinite(g)
     if valid.any():
         diff = torch.where(torch.isfinite(a[valid]), (a[valid] - g[valid]).abs(), torch.full_like(g[valid], float("inf")))
         assert (diff <= atol + rtol * g[valid].abs()).float().mean().item() >= 0.99, "precision ratio below 0.99"
         assert diff.max().item() <= max_abs, "maximum absolute error exceeded"
+
 
 import tilelang
 
@@ -491,7 +500,7 @@ def _run_boundary_case(name, batch, heads, groups, q_seqlen, k_seqlen, dim, is_c
     """Run one L2/Boundary case. Non-blocking: prints [BOUNDARY_PASS/WARN]."""
     device = "npu"
     dtype = torch.float16
-    atol, rtol = 1e-2, 1e-2
+    _atol, _rtol = 1e-2, 1e-2
     head_kv = heads // groups
     try:
         torch.manual_seed(0)

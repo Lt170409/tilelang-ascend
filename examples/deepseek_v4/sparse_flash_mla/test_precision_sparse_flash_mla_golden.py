@@ -37,10 +37,11 @@ def load_checker(source):
 
 
 def test_precision_checker():
-    source_path = pathlib.Path(__file__).resolve().parents[3] / 'examples/deepseek_v4/sparse_flash_mla/sparse_flash_mla_golden.py'
+    source_path = pathlib.Path(__file__).resolve().parents[3] / "examples/deepseek_v4/sparse_flash_mla/sparse_flash_mla_golden.py"
     checker = load_checker(source_path.read_text(encoding="utf-8"))
     if checker is None:
         import pytest
+
         pytest.skip("no check_precision function")
     actual = torch.zeros(100, dtype=torch.float16)
     golden = torch.zeros_like(actual)

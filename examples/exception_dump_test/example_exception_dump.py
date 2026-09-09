@@ -26,14 +26,24 @@ import tilelang.language as T
 import torch
 from tilelang.tools.ascend_exception_dump_bin import parse_exception_dump
 
+
 def _check_precision(actual, golden):
-    atol,rtol,cap={torch.float16:(2**-14,2**-9,.1),torch.bfloat16:(2**-10,2**-6,1.),torch.float32:(2**-16,2**-10,.01)}.get(actual.dtype,(2**-14,2**-9,.1))
-    sa=torch.isnan(actual)|torch.isinf(actual); sg=torch.isnan(golden)|torch.isinf(golden)
-    if not torch.equal(sa,sg) or (sa.any() and not torch.equal(actual[sa],golden[sg])): raise AssertionError("NaN/Inf mismatch")
-    v=~sg
+    atol, rtol, cap = {
+        torch.float16: (2**-14, 2**-9, 0.1),
+        torch.bfloat16: (2**-10, 2**-6, 1.0),
+        torch.float32: (2**-16, 2**-10, 0.01),
+    }.get(actual.dtype, (2**-14, 2**-9, 0.1))
+    sa = torch.isnan(actual) | torch.isinf(actual)
+    sg = torch.isnan(golden) | torch.isinf(golden)
+    if not torch.equal(sa, sg) or (sa.any() and not torch.equal(actual[sa], golden[sg])):
+        raise AssertionError("NaN/Inf mismatch")
+    v = ~sg
     if v.any():
-        d=(actual[v]-golden[v]).abs(); p=d<=atol+rtol*golden[v].abs()
-        if p.float().mean().item()<.99 or d.max().item()>cap: raise AssertionError("precision mismatch")
+        d = (actual[v] - golden[v]).abs()
+        p = d <= atol + rtol * golden[v].abs()
+        if p.float().mean().item() < 0.99 or d.max().item() > cap:
+            raise AssertionError("precision mismatch")
+
 
 tilelang.cache.clear_cache()
 

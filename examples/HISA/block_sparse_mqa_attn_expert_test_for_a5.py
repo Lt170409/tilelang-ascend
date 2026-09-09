@@ -44,6 +44,7 @@ import sys
 
 tilelang.disable_cache()
 
+
 def _check_precision(actual, golden):
     if not actual.is_floating_point():
         torch.testing.assert_close(actual, golden, rtol=0, atol=0)

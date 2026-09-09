@@ -38,6 +38,7 @@ def _check_precision(actual, golden, dtype):
     max_abs = abs_error.max().item()
     return ratio >= required_ratio and max_abs <= max_limit, ratio, max_abs
 
+
 tilelang.disable_cache()
 
 pass_configs = {

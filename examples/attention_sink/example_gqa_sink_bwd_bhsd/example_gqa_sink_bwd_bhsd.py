@@ -76,7 +76,10 @@ def _check_precision(actual, golden, dtype_str):
         return mismatches == 0, 1.0 - mismatches / total, 0.0 if mismatches == 0 else float("inf")
     a, g = a.float(), g.float()
     special = ~torch.isfinite(g)
-    if special.any() and (not torch.equal(torch.isnan(a[special]), torch.isnan(g[special])) or not torch.equal(torch.isinf(a[special]), torch.isinf(g[special]))):
+    if special.any() and (
+        not torch.equal(torch.isnan(a[special]), torch.isnan(g[special]))
+        or not torch.equal(torch.isinf(a[special]), torch.isinf(g[special]))
+    ):
         return False, 0.0, float("inf")
     finite = torch.isfinite(g)
     if not finite.any():
@@ -85,6 +88,8 @@ def _check_precision(actual, golden, dtype_str):
     ratio = (err <= atol + rtol * g[finite].abs()).float().mean().item()
     max_err = err.max().item()
     return ratio >= required and max_err <= max_limit, ratio, max_err
+
+
 from tilelang import language as T
 
 # ============================================================================

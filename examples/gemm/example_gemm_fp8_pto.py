@@ -33,6 +33,7 @@ def _check_precision(actual, golden, dtype):
         f"matched_ratio={matched_ratio:.4f}, max_abs_error={max_abs_error:.3e}"
     )
 
+
 tilelang.cache.clear_cache()
 
 # FP8 GEMM (TMATMUL accepting float8_e4m3 / float8_e5m2) requires the A5

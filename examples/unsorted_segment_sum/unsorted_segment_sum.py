@@ -29,7 +29,8 @@ def _check_precision(actual, golden, dtype):
     actual_fp32, golden_fp32 = actual_cpu.float(), golden_cpu.float()
     atol, rtol, limit = table.get(dtype, table["float16"])
     finite = torch.isfinite(golden_fp32)
-    if not finite.any(): return True, 1.0, 0.0
+    if not finite.any():
+        return True, 1.0, 0.0
     error = (actual_fp32[finite] - golden_fp32[finite]).abs()
     error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
     ratio, maximum = (error <= atol + rtol * golden_fp32[finite].abs()).float().mean().item(), error.max().item()

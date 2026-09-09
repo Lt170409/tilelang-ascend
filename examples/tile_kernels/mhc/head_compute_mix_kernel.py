@@ -5,9 +5,12 @@ import torch
 
 def _check_precision(actual, golden, dtype="float32"):
     configs = {
-        "float16": (2**-14, 2**-9, 1e-1, 0.99), "bfloat16": (2**-10, 2**-6, 1e0, 0.99),
-        "float32": (2**-16, 2**-10, 1e-2, 0.99), "hifloat32": (2**-16, 2**-10, 1e-2, 0.99),
-        "float8_e4m3": (2**-4, 2**-2, 1e0, 0.99), "float8_e5m2": (2**-3, 2**-1, 1e-1, 0.99),
+        "float16": (2**-14, 2**-9, 1e-1, 0.99),
+        "bfloat16": (2**-10, 2**-6, 1e0, 0.99),
+        "float32": (2**-16, 2**-10, 1e-2, 0.99),
+        "hifloat32": (2**-16, 2**-10, 1e-2, 0.99),
+        "float8_e4m3": (2**-4, 2**-2, 1e0, 0.99),
+        "float8_e5m2": (2**-3, 2**-1, 1e-1, 0.99),
     }
     actual, golden = actual.detach().cpu(), golden.detach().cpu()
     if actual.shape != golden.shape:
@@ -19,7 +22,10 @@ def _check_precision(actual, golden, dtype="float32"):
     atol, rtol, max_abs_limit, required_ratio = configs[dtype]
     actual, golden = actual.float(), golden.float()
     special = ~torch.isfinite(golden)
-    if special.any() and (not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special])) or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))):
+    if special.any() and (
+        not torch.equal(torch.isnan(actual[special]), torch.isnan(golden[special]))
+        or not torch.equal(torch.isinf(actual[special]), torch.isinf(golden[special]))
+    ):
         return False, 0.0, float("inf")
     finite = torch.isfinite(golden)
     if not finite.any():
@@ -29,6 +35,8 @@ def _check_precision(actual, golden, dtype="float32"):
     ratio = (error <= atol + rtol * golden[finite].abs()).float().mean().item()
     maximum = error.max().item()
     return ratio >= required_ratio and maximum <= max_abs_limit, ratio, maximum
+
+
 from tilelang import language as T
 
 _FWD_PASS_CONFIGS = {
@@ -280,7 +288,11 @@ def test_bwd():
 
     scale_grad_tl_result = scale_grad_partial_clean.sum().reshape(1)
     base_grad_tl_result = base_grad_partial_clean.sum(dim=0).reshape(_RESHAPE_FACTOR, mhc_mult).sum(dim=0)
-    for name, actual, golden in (("input_grad", input_grad_tl_result, input_mix.grad), ("scale_grad", scale_grad_tl_result, mhc_scale.grad), ("base_grad", base_grad_tl_result, mhc_base.grad)):
+    for name, actual, golden in (
+        ("input_grad", input_grad_tl_result, input_mix.grad),
+        ("scale_grad", scale_grad_tl_result, mhc_scale.grad),
+        ("base_grad", base_grad_tl_result, mhc_base.grad),
+    ):
         passed, ratio, max_abs = _check_precision(actual, golden)
         assert passed, f"{name}: matched_ratio={ratio:.4f}, max_abs_error={max_abs:.6e}"
     print("Kernel Output Match!")

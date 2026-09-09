@@ -4,7 +4,14 @@ import torch
 
 
 def _check_precision(actual, golden, dtype):
-    configs = {"float16": (2**-14, 2**-9, 1e-1, .99), "bfloat16": (2**-10, 2**-6, 1., .99), "float32": (2**-16, 2**-10, 1e-2, .99), "hifloat32": (2**-16, 2**-10, 1e-2, .99), "float8_e4m3": (2**-4, 2**-2, 1., .99), "float8_e5m2": (2**-3, 2**-1, 1e-1, .99)}
+    configs = {
+        "float16": (2**-14, 2**-9, 1e-1, 0.99),
+        "bfloat16": (2**-10, 2**-6, 1.0, 0.99),
+        "float32": (2**-16, 2**-10, 1e-2, 0.99),
+        "hifloat32": (2**-16, 2**-10, 1e-2, 0.99),
+        "float8_e4m3": (2**-4, 2**-2, 1.0, 0.99),
+        "float8_e5m2": (2**-3, 2**-1, 1e-1, 0.99),
+    }
     if dtype in {"int8", "int16", "int32", "int64", "uint8"}:
         assert torch.equal(actual.detach().cpu(), golden.detach().cpu()), "integer output mismatch"
         return
@@ -14,10 +21,12 @@ def _check_precision(actual, golden, dtype):
     assert torch.equal(torch.isnan(actual), torch.isnan(golden)), "NaN positions differ"
     assert torch.equal(torch.isinf(actual), torch.isinf(golden)), "Inf positions differ"
     finite = torch.isfinite(golden)
-    if not finite.any(): return
+    if not finite.any():
+        return
     errors = (actual[finite] - golden[finite]).abs()
     ratio, maximum = (errors <= atol + rtol * golden[finite].abs()).float().mean().item(), errors.max().item()
     assert ratio >= ratio_limit and maximum <= max_limit, f"matched_ratio={ratio:.4f}, max_abs_error={maximum:.3e}"
+
 
 tilelang.cache.clear_cache()
 

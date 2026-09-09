@@ -61,6 +61,7 @@ def _check_precision(actual, golden, dtype_str):
     max_abs_error = abs_error.max().item()
     return matched_ratio >= required_ratio and max_abs_error <= max_abs_limit, matched_ratio, max_abs_error
 
+
 # ========== Kernel Implementation ==========
 
 pass_configs = {

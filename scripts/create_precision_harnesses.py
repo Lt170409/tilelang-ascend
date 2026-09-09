@@ -78,25 +78,28 @@ if __name__ == "__main__":
 
 def main() -> None:
     root = pathlib.Path(__file__).resolve().parents[1]
-    examples = root / "examples"
-    for source in examples.rglob("*.py"):
-        if source.name in EXCLUDED:
-            continue
-        text = source.read_text(encoding="utf-8", errors="replace")
-        if not any(marker in text for marker in MARKERS):
-            continue
-        if "__main__" in text or "def test_" in text or "pytest" in text:
-            continue
-        try:
-            relative = source.relative_to(root)
-            depth = len(relative.parts) - 1
-            ast.parse(text, filename=str(source))
-        except (ValueError, SyntaxError):
-            continue
-        harness = source.with_name(f"test_precision_{source.stem}.py")
-        content = TEMPLATE.replace("[{depth}]", f"[{depth}]").replace("{source!r}", repr(relative.as_posix()))
-        harness.write_text(content, encoding="utf-8")
-        print(harness.relative_to(root))
+    examples_roots = [root / "examples", root / "examples_experiment"]
+    for examples in examples_roots:
+      if not examples.exists():
+        continue
+      for source in examples.rglob("*.py"):
+          if source.name in EXCLUDED:
+              continue
+          text = source.read_text(encoding="utf-8", errors="replace")
+          if not any(marker in text for marker in MARKERS):
+              continue
+          if "__main__" in text or "def test_" in text or "pytest" in text:
+              continue
+          try:
+              relative = source.relative_to(root)
+              depth = len(relative.parts) - 1
+              ast.parse(text, filename=str(source))
+          except (ValueError, SyntaxError):
+              continue
+          harness = source.with_name(f"test_precision_{source.stem}.py")
+          content = TEMPLATE.replace("[{depth}]", f"[{depth}]").replace("{source!r}", repr(relative.as_posix()))
+          harness.write_text(content, encoding="utf-8")
+          print(harness.relative_to(root))
 
 
 if __name__ == "__main__":

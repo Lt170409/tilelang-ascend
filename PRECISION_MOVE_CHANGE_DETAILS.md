@@ -244,6 +244,8 @@ python -m pytest -q $(find examples examples_experiment -type f -name 'test_prec
 
 CANN 9.1 运行结果：`53 passed, 2 skipped, 0 failed`。无效测试源码路径：0。
 
+除本 PR 新增的 55 个 `test_precision_*.py` 外，原有 98 个可运行算子入口已在 CANN 9.1 环境中完成测试并全部通过。两组结果分别对应原有算子入口回归和新增 checker 基线验证，不应合并解读为 153 个算子均已完成端到端测试。
+
 ## 变更口径与审查说明
 
 - “153 个文件”表示本 PR 相对 `origin/ascendc_pto` 中包含精度校验标记的 Python 文件总数，不表示 153 个文件都新增了测试入口。

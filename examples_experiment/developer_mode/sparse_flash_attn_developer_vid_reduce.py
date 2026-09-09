@@ -31,6 +31,7 @@ def _check_precision(actual, golden, dtype):
         f"matched_ratio={matched_ratio:.4f}, max_abs_error={max_abs_error:.3e}"
     )
 
+
 torch.set_default_device("npu")
 torch.manual_seed(0)
 

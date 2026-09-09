@@ -25,22 +25,33 @@ Kept as reference for future compiler improvements.
 
 import argparse
 import tilelang
-from tilelang import DataType, language as T
+from tilelang import language as T
 from tilelang.intrinsics import make_zn_layout, make_nz_layout
 
 import torch
 
+
 def _check_precision(actual, golden):
-    if actual.shape != golden.shape: raise AssertionError("shape mismatch")
+    if actual.shape != golden.shape:
+        raise AssertionError("shape mismatch")
     if not actual.is_floating_point():
-        if not torch.equal(actual, golden): raise AssertionError("integer mismatch")
+        if not torch.equal(actual, golden):
+            raise AssertionError("integer mismatch")
         return
     actual, golden = actual.float(), golden.float()
-    if not (torch.equal(torch.isnan(actual), torch.isnan(golden)) and torch.equal(torch.isposinf(actual), torch.isposinf(golden)) and torch.equal(torch.isneginf(actual), torch.isneginf(golden))): raise AssertionError("special values differ")
+    if not (
+        torch.equal(torch.isnan(actual), torch.isnan(golden))
+        and torch.equal(torch.isposinf(actual), torch.isposinf(golden))
+        and torch.equal(torch.isneginf(actual), torch.isneginf(golden))
+    ):
+        raise AssertionError("special values differ")
     finite = torch.isfinite(golden)
     if finite.any():
-        error = (actual[finite]-golden[finite]).abs(); error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
-        if (error <= 2**-14 + 2**-9 * golden[finite].abs()).float().mean().item() < .99 or error.max().item() > 1e-1: raise AssertionError("precision failed")
+        error = (actual[finite] - golden[finite]).abs()
+        error = torch.where(torch.isfinite(error), error, torch.full_like(error, float("inf")))
+        if (error <= 2**-14 + 2**-9 * golden[finite].abs()).float().mean().item() < 0.99 or error.max().item() > 1e-1:
+            raise AssertionError("precision failed")
+
 
 torch.set_default_device("npu")
 torch.manual_seed(0)

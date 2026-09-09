@@ -37,10 +37,11 @@ def load_checker(source):
 
 
 def test_precision_checker():
-    source_path = pathlib.Path(__file__).resolve().parents[2] / 'examples_experiment/gemm/example_gemm_transpose_l1.py'
+    source_path = pathlib.Path(__file__).resolve().parents[2] / "examples_experiment/gemm/example_gemm_transpose_l1.py"
     checker = load_checker(source_path.read_text(encoding="utf-8"))
     if checker is None:
         import pytest
+
         pytest.skip("no check_precision function")
     actual = torch.zeros(100, dtype=torch.float16)
     golden = torch.zeros_like(actual)

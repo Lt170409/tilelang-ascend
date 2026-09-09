@@ -1,5 +1,5 @@
 import tilelang
-from tilelang import DataType, language as T
+from tilelang import language as T
 import torch
 
 
@@ -30,6 +30,7 @@ def _check_precision(actual, golden, dtype):
     assert matched_ratio >= required_ratio and max_abs_error <= max_abs_limit, (
         f"matched_ratio={matched_ratio:.4f}, max_abs_error={max_abs_error:.3e}"
     )
+
 
 torch.set_default_device("npu")
 torch.manual_seed(0)

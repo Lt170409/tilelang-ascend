@@ -6,7 +6,14 @@ import torch
 
 
 def _check_precision(actual, golden, dtype):
-    configs = {"float16": (2**-14, 2**-9, 1e-1, .99), "bfloat16": (2**-10, 2**-6, 1., .99), "float32": (2**-16, 2**-10, 1e-2, .99), "hifloat32": (2**-16, 2**-10, 1e-2, .99), "float8_e4m3": (2**-4, 2**-2, 1., .99), "float8_e5m2": (2**-3, 2**-1, 1e-1, .99)}
+    configs = {
+        "float16": (2**-14, 2**-9, 1e-1, 0.99),
+        "bfloat16": (2**-10, 2**-6, 1.0, 0.99),
+        "float32": (2**-16, 2**-10, 1e-2, 0.99),
+        "hifloat32": (2**-16, 2**-10, 1e-2, 0.99),
+        "float8_e4m3": (2**-4, 2**-2, 1.0, 0.99),
+        "float8_e5m2": (2**-3, 2**-1, 1e-1, 0.99),
+    }
     if dtype in {"int8", "int16", "int32", "int64", "uint8"}:
         assert torch.equal(actual.detach().cpu(), golden.detach().cpu()), "integer output mismatch"
         return
@@ -16,10 +23,12 @@ def _check_precision(actual, golden, dtype):
     assert torch.equal(torch.isnan(actual), torch.isnan(golden)), "NaN positions differ"
     assert torch.equal(torch.isinf(actual), torch.isinf(golden)), "Inf positions differ"
     finite = torch.isfinite(golden)
-    if not finite.any(): return
+    if not finite.any():
+        return
     errors = (actual[finite] - golden[finite]).abs()
     ratio, maximum = (errors <= atol + rtol * golden[finite].abs()).float().mean().item(), errors.max().item()
     assert ratio >= ratio_limit and maximum <= max_limit, f"matched_ratio={ratio:.4f}, max_abs_error={maximum:.3e}"
+
 
 tilelang.cache.clear_cache()
 
@@ -38,6 +47,8 @@ pass_configs = {
     tilelang.PassConfigKey.TL_ASCEND_AUTO_SYNC: True,
     tilelang.PassConfigKey.TL_ASCEND_MEMORY_PLANNING: True,
 }
+
+
 @tilelang.jit(out_idx=[-1], target="pto", pass_configs=pass_configs)
 def matmul(M, N, K, block_M, block_N, K_L1, dtype="float16", accum_dtype="float"):
     m_num = M // block_M
@@ -45,9 +56,9 @@ def matmul(M, N, K, block_M, block_N, K_L1, dtype="float16", accum_dtype="float"
 
     @T.prim_func
     def main(
-            A: T.Tensor((M, K), dtype),
-            B: T.Tensor((K, N), dtype),
-            C: T.Tensor((M, N), dtype),
+        A: T.Tensor((M, K), dtype),
+        B: T.Tensor((K, N), dtype),
+        C: T.Tensor((M, N), dtype),
     ):
         with T.Kernel(m_num * n_num, is_npu=True) as (cid, _):
             bx = cid // n_num

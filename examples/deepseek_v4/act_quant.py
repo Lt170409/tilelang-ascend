@@ -159,7 +159,11 @@ def act_quant_torch(x: torch.Tensor, round_scale: bool = False) -> Tuple[torch.T
 
     scaled = x_fp32 / scales
     clipped = torch.clamp(scaled, -127, 127)
-    x_int8 = torch.round(clipped).to(torch.float16).to(torch.int8)
+    # AscendC::Round rounds halfway cases away from zero, whereas
+    # ``torch.round`` uses round-to-even.  Keep the golden path aligned with
+    # the device intrinsic so integer outputs can be checked exactly.
+    rounded = torch.where(clipped >= 0, torch.floor(clipped + 0.5), torch.ceil(clipped - 0.5))
+    x_int8 = rounded.to(torch.float16).to(torch.int8)
 
     if len(original_shape) == 3:
         x_int8 = x_int8.view(original_shape)
